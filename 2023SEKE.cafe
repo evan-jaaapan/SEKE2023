@@ -1,0 +1,516 @@
+mod! LABEL{ 
+ [Label]
+ ops accel nothing brake : -> Label
+ pred _=_ : Label Label {comm} 
+ var L : Label
+ eq (L = L) = true .
+ eq (accel = nothing) = false .
+ eq (accel = brake) = false .
+ eq (brake = nothing) = false .
+}
+
+
+mod* VEHICLE{ 
+ pr(LABEL + RAT)
+ *[ Sys ]*
+ var S : Sys 
+ vars V A X T Y Z : Rat
+ op c-tick : Rat Sys -> Bool
+ op init : -> Sys
+ bops x1 v1 now : Sys -> Rat
+ op a1 : Label -> Rat
+ bop loc1 : Sys -> Label
+ op nextv : Rat Rat Rat -> Rat
+ op nextx : Rat Rat Rat Rat -> Rat
+
+ bop tick : Rat Sys -> Sys
+ bops a b n : Sys -> Sys
+ 
+ ceq tick(T,S) = S if not c-tick(T,S) .
+
+ eq c-tick(T,S) =
+(loc1(S) = brake implies (0 <= nextv(v1(S), a1(loc1(S)), T) and nextv(v1(S), a1(loc1(S)), T) <= 4)) and
+(loc1(S) = accel implies ((0 <= nextv(v1(S), a1(loc1(S)), T) and nextv(v1(S), a1(loc1(S)), T) <= 4) and (nextx(x1(S), v1(S), a1(loc1(S)), T) <= 36))) and
+(loc1(S) = nothing implies (((0 < nextv(v1(S), a1(loc1(S)), T) and nextv(v1(S), a1(loc1(S)), T) <= 4) and (nextx(x1(S), v1(S), a1(loc1(S)), T) <= 36)) or (nextv(v1(S), a1(loc1(S)), T) = 0))) .
+
+ eq 0 * X = 0 .
+ eq 1 * X = X .
+ eq (-1) * X = (- X) .
+ eq (X + Y) * (X + Y) = X * X + 2 * X * Y + Y * Y .
+ eq Z * (X + Y) = Z * X + Z * Y .
+ eq (X + Z <= Y + Z) = (X <= Y) .
+ eq (- X) * (- Y) = X * Y .
+ eq - (X * Y) = (- X) * Y .
+ eq - (- X) = X .
+ eq 1/2 * (- X) = (-1/2) * X .
+
+
+  ceq (X < 45) = true if X <= 36 .
+  -- ceq (X <= - 1/2 * V * V + 44) = false if ((V * T - 1/2 * T * T + X) < 50) = false .
+
+  ceq (X <= (44 + (-1/2 * (V * V)))) = true if X <= 36 .
+  ceq (-8 <= (-1/2 * (X * X) + ((- X) * Y) + (-1/2 * (Y * Y)))) = true if ((X + Y) <= 4) = true .
+  ceq (- Z <= 8) = true if (-8 <= Z) = true .
+  ceq (X <= (44 + Z)) = true if (- Z <= 8) and (X <= 36) .
+  ceq (-8 <= (-1/2 * (X * X))) = true if (X <= 4) = true .
+  
+  
+
+
+ ceq now(tick(T,S)) = now(S) + T if c-tick(T,S) .
+ eq now(init) = 0 .
+ eq now(a(S)) = now(S) .
+ eq now(b(S)) = now(S) .
+ eq now(n(S)) = now(S) .
+
+ eq nextv(V,A,T) = V + A * T .
+ eq nextx(X,V,A,T) = V * T + 1/2 * A * T * T + X .
+
+
+ eq a1(accel) = 1 .
+ eq a1(brake) = -1 .
+ eq a1(nothing) = 0 .
+
+ ceq loc1(tick(T,S)) = loc1(S) if c-tick(T,S) .
+ eq loc1(init) = accel .
+ eq loc1(a(S)) = accel .
+ eq loc1(b(S)) = brake .
+ eq loc1(n(S)) = nothing .
+
+ ceq v1(tick(T,S)) = nextv(v1(S), a1(loc1(S)), T) if c-tick(T,S) .
+ eq v1(init) = 0 . 
+ eq v1(a(S)) = v1(S) .
+ eq v1(b(S)) = v1(S) .
+ eq v1(n(S)) = v1(S) .
+
+
+ ceq x1(tick(T,S)) = nextx(x1(S), v1(S), a1(loc1(S)), T) if c-tick(T,S) .
+ eq x1(init) = 0 .
+ eq x1(a(S)) = x1(S) .
+ eq x1(b(S)) = x1(S) .
+ eq x1(n(S)) = x1(S) .
+ eq (V = T) = (V <= T and V >= T) .
+}
+
+
+eof
+
+
+
+mod INV{
+pr(VEHICLE)
+ops inv1 inv2 : Sys -> Bool 
+
+var S : Sys 
+vars V A X T : Rat 
+eq inv1(S) = (x1(S) < 45) .
+eq inv2(S) = (x1(S) <= -1/2 * v1(S) * v1(S) + 44) .
+}
+
+--> initial1 (true)
+-->
+-->
+open INV .
+red inv1(init) .
+close
+
+--> initial2 (true)
+-->
+-->
+open INV .
+red inv2(init) .
+close
+
+
+mod ISTEP{
+pr(INV) .
+ops istep1 istep2 : -> Bool
+ops s s' : -> Sys
+eq istep1 = inv1(s) implies inv1(s') .
+eq istep2 = inv2(s) implies inv2(s') .
+}
+
+
+--> inv1 : ~c-tick（true）
+-->
+open ISTEP .
+op t1 : -> Rat .
+eq c-tick(t1,s) = false .
+eq s' = tick(t1,s) .
+red istep1 .
+close
+
+--> inv2 : ~c-tick（true）
+-->
+open ISTEP .
+op t1 : -> Rat .
+eq c-tick(t1,s) = false .
+eq s' = tick(t1,s) .
+red istep2 .
+close
+
+
+--> inv1 : c-tick,accel,（true）
+-->
+-->
+open ISTEP .
+op t1 : -> Rat .
+eq c-tick(t1,s) = true .
+eq s' = tick(t1,s) .
+eq loc1(s) = accel .
+eq (0 <=(t1 + v1(s))) = true .
+eq ((t1 + v1(s)) <= 4) = true .
+eq ((v1(s) * t1 + 1/2 * t1 * t1 + x1(s)) <= 36) = true .
+red istep1 .
+close
+
+--> inv2 : c-tick,accel,（true）
+-->
+-->
+open ISTEP .
+op t1 : -> Rat .
+eq c-tick(t1,s) = true .
+eq s' = tick(t1,s) .
+eq loc1(s) = accel .
+eq (0 <=(t1 + v1(s))) = true .
+eq ((t1 + v1(s)) <= 4) = true .
+eq ((v1(s) * t1 + 1/2 * t1 * t1 + x1(s)) <= 36) = true .
+red istep2 .
+close
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+--> inv1 : c-tick,nothing, v1(s) = 0(true)
+-->
+open ISTEP .
+op t1 : -> Rat .
+eq c-tick(t1,s) = true .
+eq s' = tick(t1,s) .
+eq loc1(s) = nothing .
+eq v1(s) = 0 .
+red istep1 .
+close
+
+--> inv2 : c-tick,nothing, v1(s) = 0(true)
+-->
+-->
+open ISTEP .
+op t1 : -> Rat .
+eq c-tick(t1,s) = true .
+eq s' = tick(t1,s) .
+eq loc1(s) = nothing .
+eq v1(s) = 0 .
+red istep2 .
+close
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+--> inv1 : c-tick, nothing,(0 <= v1(s))， (v1(s) <= 4)， ((v1(s) * t1 + x1(s)) <= 36)（true）
+-->
+-->
+open ISTEP .
+op t1 : -> Rat .
+eq c-tick(t1,s) = true .
+eq s' = tick(t1,s) .
+eq loc1(s) = nothing .
+eq (0 <= v1(s)) = true .
+eq (v1(s) <= 4) = true .
+eq ((v1(s) * t1 + x1(s)) <= 36) = true .
+red istep1 .
+close
+
+
+--> inv2 : c-tick, nothing,(0 <= v1(s))， (v1(s) <= 4)， ((v1(s) * t1 + x1(s)) <= 36)（true）
+-->
+-->
+open ISTEP .
+op t1 : -> Rat .
+eq c-tick(t1,s) = true .
+eq s' = tick(t1,s) .
+eq loc1(s) = nothing .
+eq (0 <= v1(s)) = true .
+eq (v1(s) <= 4) = true .
+eq ((v1(s) * t1 + x1(s)) <= 36) = true .
+red istep2 .
+close
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+--> inv1 : c-tick,brake, ~x1(s) < 45(true)
+-->
+-->
+open ISTEP .
+op t1 : -> Rat .
+eq c-tick(t1,s) = true .
+eq s' = tick(t1,s) .
+eq loc1(s) = brake .
+eq (0 <= ((- t1) + v1(s))) = true .
+eq (((- t1) + v1(s)) <= 4) = true .
+
+eq (x1(s) < 45) = false .
+red istep1 .
+close
+
+
+
+--> inv1 : c-tick, brake, x1(s) < 45, (((t1 * v1(s)) + ((-1/2 * (t1 * t1)) + x1(s))) < 45)(true)
+--> 
+-->
+open ISTEP .
+op t1 : -> Rat .
+eq c-tick(t1,s) = true .
+eq s' = tick(t1,s) .
+eq loc1(s) = brake .
+eq (0 <= ((- t1) + v1(s))) = true .
+eq (((- t1) + v1(s)) <= 4) = true .
+
+eq (x1(s) < 45) = true .
+eq (((t1 * v1(s)) + ((-1/2 * (t1 * t1)) + x1(s))) < 45) = true .
+red istep1 .
+close 
+
+
+
+--> inv2, tick : c-tick, brake, x1(s) < 45, ~(((t1 * v1(s)) + ((-1/2 * (t1 * t1)) + x1(s))) < 45)(true)
+--> 
+-->
+open ISTEP .
+op t1 : -> Rat .
+eq c-tick(t1,s) = true .
+eq s' = tick(t1,s) .
+eq loc1(s) = brake .
+eq (0 <= ((- t1) + v1(s))) = true .
+eq (((- t1) + v1(s)) <= 4) = true .
+
+eq (x1(s) < 45) = true .
+eq (((t1 * v1(s)) + ((-1/2 * (t1 * t1)) + x1(s))) < 45) = false .
+
+ceq (x1(s) <= -1/2 * v1(s) * v1(s) + 44) = false if (((t1 * v1(s)) + ((-1/2 * (t1 * t1)) + x1(s))) < 45) = false .
+red inv2(s) implies istep1 .
+close
+
+
+--> inv2 : c-tick,brake, (true)
+-->
+--> 
+
+open ISTEP .
+op t1 : -> Rat .
+eq c-tick(t1,s) = true .
+eq s' = tick(t1,s) .
+eq loc1(s) = brake .
+eq (0 <= ((- t1) + v1(s))) = true .
+eq (((- t1) + v1(s)) <= 4) = true .
+red istep2 .
+close
+eof
+
+red now(tick(1,n(tick(4,b(tick(7,n(tick(4,a(init))))))))) .(16):NzNat
+red x1(tick(1,n(tick(4,b(tick(7,n(tick(4,a(init))))))))) .(44):NzNat
+red v1(tick(1,n(tick(4,b(tick(7,n(tick(4,a(init))))))))) .(0):Zero
+red loc1(tick(1,n(tick(4,b(tick(7,n(tick(4,a(init))))))))) .(nothing):Label
+
+
+-- CafeOBJ> open VEHICLE .
+
+%VEHICLE> red x1(tick(1,n(tick(4,b(tick(7,n(tick(4,a(init))))))))) .
+-- reduce in %VEHICLE : (x1(tick(1,n(tick(4,b(tick(7,n(tick(4,a(init)))))))))):Rat
+(44):NzNat
+(0.0000 sec for parse, 634.3410 sec for 194650211 rewrites + 544449526 matches)
+
+
+
+%VEHICLE> red v1(tick(1,n(tick(4,b(tick(7,n(tick(4,a(init))))))))) .
+-- reduce in %VEHICLE : (v1(tick(1,n(tick(4,b(tick(7,n(tick(4,a(init)))))))))):Rat
+(0):Zero
+(0.0000 sec for parse, 614.2410 sec for 190713468 rewrites + 533438165 matches)
+
+
+%VEHICLE> red loc1(tick(1,n(tick(4,b(tick(7,n(tick(4,a(init))))))))) .
+-- reduce in %VEHICLE : (loc1(tick(1,n(tick(4,b(tick(7,n(tick(4,a(init)))))))))):Label
+(nothing):Label
+(0.0000 sec for parse, 592.0920 sec for 186825348 rewrites + 522562846 matches)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+     
+
